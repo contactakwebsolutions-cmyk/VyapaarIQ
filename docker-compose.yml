@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vyapaariq_db
+    restart: always
+    environment:
+      POSTGRES_USER: vyapaar_user
+      POSTGRES_PASSWORD: vyapaar_password
+      POSTGRES_DB: vyapaariq
+    ports:
+      - "5440:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # This automatically runs schema.sql when the container initializes for the first time
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  pgdata:

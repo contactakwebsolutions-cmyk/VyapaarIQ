@@ -1,0 +1,21 @@
+const pool = require('./db');
+
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1'); // DB test
+
+    res.json({
+      status: 'ok',
+      app: 'running',
+      database: 'connected'
+    });
+
+  } catch (err) {
+    res.json({
+      status: 'ok',
+      app: 'running',
+      database: 'not connected',
+      error: err.message
+    });
+  }
+});
