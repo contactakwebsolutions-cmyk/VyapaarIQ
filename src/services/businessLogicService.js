@@ -26,42 +26,9 @@ async function calculateOpeningBalanceAtDate(userId, obValue, tillDate) {
 }
 
 async function formatTransactionResponse(userId, transactionType, amount, categoryOrName, baseMessage, lang = 'english') {
-    // Fetch current user balance info
-    const userRes = await db.query('SELECT opening_balance FROM users WHERE id = $1', [userId]);
-    const user = userRes.rows[0];
-    const obValue = user && (user.opening_balance !== null && user.opening_balance !== undefined) ? parseFloat(user.opening_balance) : null;
-
-    let response = baseMessage;
-
-    // Add transaction summary box if OB is set
-    if (obValue !== null) {
-        const symbol = lang === 'telugu' ? 'రూ.' : 'Rs.';
-
-        // Get current metrics
-        const metricsRes = await db.query(`
-            SELECT
-                COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as total_received,
-                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses
-            FROM transactions
-            WHERE user_id = $1
-        `, [userId]);
-
-        const totalReceived = parseFloat(metricsRes.rows[0].total_received);
-        const totalExpenses = parseFloat(metricsRes.rows[0].total_expenses);
-        const closingBalance = obValue + totalReceived - totalExpenses;
-
-        response += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        response += `📊 *Balance Summary*\n`;
-        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        response += `Opening: ${symbol}${obValue}\n`;
-        response += `Received: ${symbol}${totalReceived}\n`;
-        response += `Expenses: ${symbol}${totalExpenses}\n`;
-        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        response += `Closing: ${symbol}${closingBalance}\n`;
-        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    }
-
-    return response;
+    // Simply return base message without balance summary
+    // Balance summary is shown in daily/reports, not in transaction responses
+    return baseMessage;
 }
 
 function formatBatchEntryLine(commandObj) {
@@ -379,17 +346,33 @@ async function appendVyapaarNetMetrics(userId, baseMessage, lang, user = null) {
     const metrics = await getVyapaarAllTimeMetrics(userId, user);
     const symbol = lang === 'telugu' ? 'రూ.' : 'Rs.';
 
-    let netStr = `\n---\n${t(lang, 'net_metrics_title')}\n`;
-    netStr += `${t(lang, 'net_sales')}: ${symbol}${metrics.netSales}\n`;
-    netStr += `${t(lang, 'net_expenses')}: ${symbol}${metrics.netExpenses}\n`;
-    netStr += `${t(lang, 'net_profit')}: ${symbol}${metrics.netProfit}\n`;
-    netStr += `${t(lang, 'net_received')}: ${symbol}${metrics.netReceived}\n`;
-    netStr += `${t(lang, 'net_pending')}: ${symbol}${metrics.netPending}`;
+    // Premium UI for Net Metrics
+    let netStr = `\n\n╔════════════════════════════╗\n`;
+    netStr += `║ ${t(lang, 'net_metrics_title')}\n`;
+    netStr += `╠════════════════════════════╣\n`;
+    netStr += `║ 💰 ${t(lang, 'net_sales')}\n`;
+    netStr += `║    ${symbol}${metrics.netSales}\n`;
+    netStr += `║\n`;
+    netStr += `║ 💸 ${t(lang, 'net_expenses')}\n`;
+    netStr += `║    ${symbol}${metrics.netExpenses}\n`;
+    netStr += `║\n`;
+    netStr += `║ 📈 ${t(lang, 'net_profit')}\n`;
+    netStr += `║    ${symbol}${metrics.netProfit}\n`;
+    netStr += `║\n`;
+    netStr += `║ 💵 ${t(lang, 'net_received')}\n`;
+    netStr += `║    ${symbol}${metrics.netReceived}\n`;
+    netStr += `║\n`;
+    netStr += `║ ⏳ ${t(lang, 'net_pending')}\n`;
+    netStr += `║    ${symbol}${metrics.netPending}\n`;
 
     // Add closing balance if OB is set
     if (metrics.closingBalance !== null) {
-        netStr += `\n${t(lang, 'net_closing_balance')}: ${symbol}${metrics.closingBalance}`;
+        netStr += `║\n`;
+        netStr += `║ 💎 ${t(lang, 'net_closing_balance')}\n`;
+        netStr += `║    ${symbol}${metrics.closingBalance}\n`;
     }
+
+    netStr += `╚════════════════════════════╝`;
 
     return baseMessage + netStr;
 }
