@@ -346,33 +346,26 @@ async function appendVyapaarNetMetrics(userId, baseMessage, lang, user = null) {
     const metrics = await getVyapaarAllTimeMetrics(userId, user);
     const symbol = lang === 'telugu' ? 'రూ.' : 'Rs.';
 
-    // Premium UI for Net Metrics
-    let netStr = `\n\n╔════════════════════════════╗\n`;
-    netStr += `║ ${t(lang, 'net_metrics_title')}\n`;
-    netStr += `╠════════════════════════════╣\n`;
-    netStr += `║ 💰 ${t(lang, 'net_sales')}\n`;
-    netStr += `║    ${symbol}${metrics.netSales}\n`;
-    netStr += `║\n`;
-    netStr += `║ 💸 ${t(lang, 'net_expenses')}\n`;
-    netStr += `║    ${symbol}${metrics.netExpenses}\n`;
-    netStr += `║\n`;
-    netStr += `║ 📈 ${t(lang, 'net_profit')}\n`;
-    netStr += `║    ${symbol}${metrics.netProfit}\n`;
-    netStr += `║\n`;
-    netStr += `║ 💵 ${t(lang, 'net_received')}\n`;
-    netStr += `║    ${symbol}${metrics.netReceived}\n`;
-    netStr += `║\n`;
-    netStr += `║ ⏳ ${t(lang, 'net_pending')}\n`;
-    netStr += `║    ${symbol}${metrics.netPending}\n`;
+    // Clean, compact format for Net Metrics
+    let netStr = `\n\n`;
 
-    // Add closing balance if OB is set
-    if (metrics.closingBalance !== null) {
-        netStr += `║\n`;
-        netStr += `║ 💎 ${t(lang, 'net_closing_balance')}\n`;
-        netStr += `║    ${symbol}${metrics.closingBalance}\n`;
+    // Opening Balance (if set)
+    if (metrics.openingBalance !== null) {
+        const obFormatted = parseFloat(metrics.openingBalance).toFixed(2).replace(/\.00$/, '');
+        netStr += `${t(lang, 'report_opening_balance')}: ${symbol}${obFormatted}\n`;
     }
 
-    netStr += `╚════════════════════════════╝`;
+    netStr += `${t(lang, 'report_sales')}: ${symbol}${parseFloat(metrics.netSales).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'report_expenses')}: ${symbol}${parseFloat(metrics.netExpenses).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'report_profit')}: ${symbol}${parseFloat(metrics.netProfit).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'report_received')}: ${symbol}${parseFloat(metrics.netReceived).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `\n${t(lang, 'report_total_pending')}: ${symbol}${parseFloat(metrics.netPending).toFixed(2).replace(/\.00$/, '')}\n`;
+
+    // Closing Balance (if OB is set)
+    if (metrics.closingBalance !== null) {
+        const cbFormatted = parseFloat(metrics.closingBalance).toFixed(2).replace(/\.00$/, '');
+        netStr += `${t(lang, 'report_closing_balance')}: ${symbol}${cbFormatted}`;
+    }
 
     return baseMessage + netStr;
 }
@@ -1028,7 +1021,7 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
         return t(lang, 'ob_updated', { amount: newOb });
     }
     if (upper === 'NO' && currentUser.pending_ob_amount !== null && currentUser.pending_ob_amount !== undefined) {
-        await db.query('UPDATE users SET pending_ob_amount = NULL WHERE id = $2', [currentUser.id]);
+        await db.query('UPDATE users SET pending_ob_amount = NULL WHERE id = $1', [currentUser.id]);
         return t(lang, 'ob_confirm_cancelled');
     }
 
@@ -1057,8 +1050,8 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
         return getWelcomeMessage(lang);
     }
 
-    // 1. Language Enforcement (skip for system/admin/payment notifications)
-    if (!['SET_LANG', 'WELCOME', 'PAID', 'ACTIVATE'].includes(commandObj.command)) {
+    // 1. Language Enforcement (skip for system/admin/payment notifications and OB)
+    if (!['SET_LANG', 'WELCOME', 'PAID', 'ACTIVATE', 'SET_OB'].includes(commandObj.command)) {
         if (lang === 'telugu' && commandObj.sourceLang === 'english') {
             return t('telugu', 'err_use_telugu');
         }
