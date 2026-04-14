@@ -12,6 +12,19 @@ function formatRupees(amount) {
     return Number.isInteger(amount) ? String(amount) : String(amount);
 }
 
+async function calculateOpeningBalanceAtDate(userId, obValue, tillDate) {
+    const res = await db.query(`
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as total_received,
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses
+        FROM transactions
+        WHERE user_id = $1 AND created_at < $2
+    `, [userId, tillDate]);
+    const received = parseFloat(res.rows[0].total_received);
+    const expenses = parseFloat(res.rows[0].total_expenses);
+    return obValue + received - expenses;
+}
+
 function formatBatchEntryLine(commandObj) {
     if (!commandObj || !commandObj.command) return null;
 
@@ -77,7 +90,7 @@ async function processBatchEntryMessage({ user, subscriptionInfo, commandTexts }
     }
 
     const lang = user.language || 'english';
-    return await appendVyapaarNetMetrics(user.id, message, lang);
+    return await appendVyapaarNetMetrics(user.id, message, lang, user);
 }
 
 async function handleSetLanguage(user, lang) {
@@ -239,18 +252,18 @@ async function handleUndo(userId, lang = 'english') {
 async function handleSyncBalances(userId, lang = 'english') {
     // 1. Get all customers for this user
     const customers = await db.query('SELECT id, name FROM customers WHERE user_id = $1', [userId]);
-    
+
     let fixCount = 0;
     for (const customer of customers.rows) {
         // 2. Recalculate pending: Sum(sale where is_credit=true) - Sum(payment)
         const calcRes = await db.query(`
-            SELECT 
+            SELECT
                 COALESCE(SUM(CASE WHEN type = 'sale' AND is_credit = true THEN amount ELSE 0 END), 0) -
                 COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as real_pending
-            FROM transactions 
+            FROM transactions
             WHERE user_id = $1 AND customer_id = $2
         `, [userId, customer.id]);
-        
+
         const realPending = parseFloat(calcRes.rows[0].real_pending);
         const finalPending = realPending < 0 ? 0 : realPending;
 
@@ -262,7 +275,20 @@ async function handleSyncBalances(userId, lang = 'english') {
     return `🔄 *${t(lang, 'sync_complete')}*\n${t(lang, 'sync_desc', { count: fixCount })}`;
 }
 
-async function getVyapaarAllTimeMetrics(userId) {
+async function handleSetOpeningBalance(user, amount, lang = 'english') {
+    const existing = user.opening_balance;
+    if (existing === null || existing === undefined) {
+        // First time - save directly
+        await db.query('UPDATE users SET opening_balance = $1 WHERE id = $2', [amount, user.id]);
+        return t(lang, 'ob_set', { amount });
+    } else {
+        // Already set - ask for confirmation
+        await db.query('UPDATE users SET pending_ob_amount = $1 WHERE id = $2', [amount, user.id]);
+        return t(lang, 'ob_confirm_update');
+    }
+}
+
+async function getVyapaarAllTimeMetrics(userId, user = null) {
     const res = await db.query(`
         SELECT type, COALESCE(SUM(amount), 0) as total
         FROM transactions
@@ -278,26 +304,51 @@ async function getVyapaarAllTimeMetrics(userId) {
     const pendingRes = await db.query('SELECT COALESCE(SUM(pending_amount), 0) as total FROM customers WHERE user_id = $1', [userId]);
     const netPending = parseFloat(pendingRes.rows[0].total);
 
+    // Get opening balance if not provided
+    let openingBalance = null;
+    if (user && (user.opening_balance !== null && user.opening_balance !== undefined)) {
+        openingBalance = parseFloat(user.opening_balance);
+    }
+
+    // Calculate closing balance if OB is set
+    let closingBalance = null;
+    if (openingBalance !== null) {
+        closingBalance = openingBalance + totals.payment - totals.expense;
+    }
+
     return {
         netSales: totals.sale,
         netExpenses: totals.expense,
         netProfit: totals.sale - totals.expense,
         netReceived: totals.payment,
-        netPending
+        netPending,
+        openingBalance,
+        closingBalance
     };
 }
 
-async function appendVyapaarNetMetrics(userId, baseMessage, lang) {
-    const metrics = await getVyapaarAllTimeMetrics(userId);
+async function appendVyapaarNetMetrics(userId, baseMessage, lang, user = null) {
+    // Fetch user if not provided
+    if (!user) {
+        const userRes = await db.query('SELECT opening_balance FROM users WHERE id = $1', [userId]);
+        user = userRes.rows[0] || {};
+    }
+
+    const metrics = await getVyapaarAllTimeMetrics(userId, user);
     const symbol = lang === 'telugu' ? 'రూ.' : 'Rs.';
-    
+
     let netStr = `\n---\n${t(lang, 'net_metrics_title')}\n`;
     netStr += `${t(lang, 'net_sales')}: ${symbol}${metrics.netSales}\n`;
     netStr += `${t(lang, 'net_expenses')}: ${symbol}${metrics.netExpenses}\n`;
     netStr += `${t(lang, 'net_profit')}: ${symbol}${metrics.netProfit}\n`;
     netStr += `${t(lang, 'net_received')}: ${symbol}${metrics.netReceived}\n`;
     netStr += `${t(lang, 'net_pending')}: ${symbol}${metrics.netPending}`;
-    
+
+    // Add closing balance if OB is set
+    if (metrics.closingBalance !== null) {
+        netStr += `\n${t(lang, 'net_closing_balance')}: ${symbol}${metrics.closingBalance}`;
+    }
+
     return baseMessage + netStr;
 }
 
@@ -354,7 +405,7 @@ async function getReportData(userId, startDate, endDate) {
     };
 }
 
-function formatReportText(titleKeyOrText, data, lang = 'english', insights = null) {
+function formatReportText(titleKeyOrText, data, lang = 'english', insights = null, openingBalance = null, closingBalance = null) {
     const { totals, receivedBreakdown, totalPending, topPendingList } = data;
     const profit = totals.sale - totals.expense;
 
@@ -365,11 +416,17 @@ function formatReportText(titleKeyOrText, data, lang = 'english', insights = nul
     }
 
     let reportStr = `📊 *${title}*\n\n`;
+
+    // Opening Balance
+    if (openingBalance !== null && openingBalance !== undefined) {
+        reportStr += `${t(lang, 'report_opening_balance')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${parseFloat(openingBalance)}\n`;
+    }
+
     reportStr += `${t(lang, 'report_sales')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${totals.sale}\n`;
     reportStr += `${t(lang, 'report_expenses')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${totals.expense}\n`;
     reportStr += `${t(lang, 'report_profit')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${profit}\n`;
     reportStr += `${t(lang, 'report_received')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${totals.payment}\n`;
-    
+
     if (receivedBreakdown.length > 0) {
         receivedBreakdown.forEach(p => {
             const dateStr = formatDateReport(new Date(p.payment_date));
@@ -380,6 +437,11 @@ function formatReportText(titleKeyOrText, data, lang = 'english', insights = nul
     reportStr += `\n`;
 
     reportStr += `${t(lang, 'report_total_pending')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${totalPending}\n`;
+
+    // Closing Balance
+    if (closingBalance !== null && closingBalance !== undefined) {
+        reportStr += `${t(lang, 'report_closing_balance')}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${parseFloat(closingBalance)}\n`;
+    }
 
     if (topPendingList.length > 0) {
         reportStr += `\n*${t(lang, 'report_top_pending')}*\n`;
@@ -470,7 +532,7 @@ function generateInsightsLocalized(data, prevData, totalPending, lang = 'english
     return insights.slice(0, 4).join("\n");
 }
 
-async function handleWeeklyReport(userId, lang = 'english') {
+async function handleWeeklyReport(userId, user, lang = 'english') {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
@@ -478,60 +540,100 @@ async function handleWeeklyReport(userId, lang = 'english') {
 
     const data = await getReportData(userId, sevenDaysAgo, new Date());
     const prevDataResult = await db.query(`
-        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions 
+        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions
         WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY type
     `, [userId, fourteenDaysAgo, sevenDaysAgo]);
-    
+
     const prevTotals = { sale: 0, expense: 0, payment: 0 };
     prevDataResult.rows.forEach(row => prevTotals[row.type] = parseFloat(row.total));
 
     const insights = generateInsightsLocalized(data.totals, prevTotals, data.totalPending, lang);
-    return formatReportText('report_title_weekly', data, lang, insights);
+
+    // Calculate Opening Balance and Closing Balance
+    let openingBalance = null;
+    let closingBalance = null;
+    if (user && (user.opening_balance !== null && user.opening_balance !== undefined)) {
+        const obValue = parseFloat(user.opening_balance);
+        openingBalance = await calculateOpeningBalanceAtDate(userId, obValue, sevenDaysAgo);
+        closingBalance = openingBalance + data.totals.payment - data.totals.expense;
+    }
+
+    return formatReportText('report_title_weekly', data, lang, insights, openingBalance, closingBalance);
 }
 
-async function handleMonthlyReport(userId, lang = 'english') {
+async function handleMonthlyReport(userId, user, lang = 'english') {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    
+
     const data = await getReportData(userId, startOfMonth, new Date());
     const prevDataResult = await db.query(`
-        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions 
+        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions
         WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY type
     `, [userId, startOfPrevMonth, startOfMonth]);
-    
+
     const prevTotals = { sale: 0, expense: 0, payment: 0 };
     prevDataResult.rows.forEach(row => prevTotals[row.type] = parseFloat(row.total));
 
     const insights = generateInsightsLocalized(data.totals, prevTotals, data.totalPending, lang);
-    return formatReportText('report_title_monthly', data, lang, insights);
+
+    // Calculate Opening Balance and Closing Balance
+    let openingBalance = null;
+    let closingBalance = null;
+    if (user && (user.opening_balance !== null && user.opening_balance !== undefined)) {
+        const obValue = parseFloat(user.opening_balance);
+        openingBalance = await calculateOpeningBalanceAtDate(userId, obValue, startOfMonth);
+        closingBalance = openingBalance + data.totals.payment - data.totals.expense;
+    }
+
+    return formatReportText('report_title_monthly', data, lang, insights, openingBalance, closingBalance);
 }
 
-async function handleCustomReport(userId, dateStr, lang = 'english') {
+async function handleCustomReport(userId, user, dateStr, lang = 'english') {
     // Parse in local IST time by appending T00:00:00
     const startOfDay = new Date(dateStr + 'T00:00:00');
     const endOfDay = new Date(startOfDay.getTime() + (24 * 60 * 60 * 1000));
 
     const data = await getReportData(userId, startOfDay, endOfDay);
-    return formatReportText('report_title_custom', data, lang);
+
+    // Calculate Opening Balance and Closing Balance
+    let openingBalance = null;
+    let closingBalance = null;
+    if (user && (user.opening_balance !== null && user.opening_balance !== undefined)) {
+        const obValue = parseFloat(user.opening_balance);
+        openingBalance = await calculateOpeningBalanceAtDate(userId, obValue, startOfDay);
+        closingBalance = openingBalance + data.totals.payment - data.totals.expense;
+    }
+
+    return formatReportText('report_title_custom', data, lang, null, openingBalance, closingBalance);
 }
 
-async function handleYearlyReport(userId, lang = 'english') {
+async function handleYearlyReport(userId, user, lang = 'english') {
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const startOfPrevYear = new Date(now.getFullYear() - 1, 0, 1);
-    
+
     const data = await getReportData(userId, startOfYear, new Date());
     const prevDataResult = await db.query(`
-        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions 
+        SELECT type, COALESCE(SUM(amount), 0) as total FROM transactions
         WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY type
     `, [userId, startOfPrevYear, startOfYear]);
-    
+
     const prevTotals = { sale: 0, expense: 0, payment: 0 };
     prevDataResult.rows.forEach(row => prevTotals[row.type] = parseFloat(row.total));
 
     const insights = generateInsightsLocalized(data.totals, prevTotals, data.totalPending, lang);
-    return formatReportText('report_title_yearly', data, lang, insights);
+
+    // Calculate Opening Balance and Closing Balance
+    let openingBalance = null;
+    let closingBalance = null;
+    if (user && (user.opening_balance !== null && user.opening_balance !== undefined)) {
+        const obValue = parseFloat(user.opening_balance);
+        openingBalance = await calculateOpeningBalanceAtDate(userId, obValue, startOfYear);
+        closingBalance = openingBalance + data.totals.payment - data.totals.expense;
+    }
+
+    return formatReportText('report_title_yearly', data, lang, insights, openingBalance, closingBalance);
 }
 
 async function handlePdfReport(userId, phoneNumber, type, lang = 'english', dateStr = null) {
@@ -891,6 +993,17 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
 
     const lang = currentUser.language || 'english';
 
+    // Handle YES/NO for pending OB update (checked early, before other commands)
+    if (upper === 'YES' && currentUser.pending_ob_amount !== null && currentUser.pending_ob_amount !== undefined) {
+        const newOb = parseFloat(currentUser.pending_ob_amount);
+        await db.query('UPDATE users SET opening_balance = $1, pending_ob_amount = NULL WHERE id = $2', [newOb, currentUser.id]);
+        return t(lang, 'ob_updated', { amount: newOb });
+    }
+    if (upper === 'NO' && currentUser.pending_ob_amount !== null && currentUser.pending_ob_amount !== undefined) {
+        await db.query('UPDATE users SET pending_ob_amount = NULL WHERE id = $2', [currentUser.id]);
+        return t(lang, 'ob_confirm_cancelled');
+    }
+
     // Multi-command support (only for entry commands). Keeps single-command behavior unchanged.
     // Primary separator: newline, secondary: comma (when it looks like a new command).
     if (status !== 'expired') {
@@ -939,6 +1052,10 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
         return await handleSetLanguage(currentUser, commandObj.lang);
     }
 
+    if (commandObj.command === 'SET_OB') {
+        return await handleSetOpeningBalance(currentUser, commandObj.amount, lang);
+    }
+
     // Always allow ACTIVATE for admin (should work even if the admin's own subscription is expired).
     if (commandObj.command === 'ACTIVATE') {
         return await handleAdminActivateCommand(user, commandObj);
@@ -969,6 +1086,13 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
 
     const userId = user.id;
 
+    // Check if OB is set before allowing transactions (SALE, EXPENSE, PAYMENT)
+    if (['SALE', 'EXPENSE', 'PAYMENT'].includes(commandObj.command)) {
+        if (currentUser.opening_balance === null || currentUser.opening_balance === undefined) {
+            return t(lang, 'ob_missing');
+        }
+    }
+
     let response;
 
     if (commandObj.command === 'SALE') {
@@ -991,21 +1115,21 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
             handlePdfReport(userId, user.phone_number, 'weekly', lang);
             response = lang === 'telugu' ? "⏳ వారపు PDF నివేదిక తయారవుతోంది..." : "⏳ Generating Weekly PDF report...";
         } else {
-            response = await handleWeeklyReport(userId, lang);
+            response = await handleWeeklyReport(userId, currentUser, lang);
         }
     } else if (commandObj.command === 'MONTHLY') {
         if (commandObj.isPdf) {
             handlePdfReport(userId, user.phone_number, 'monthly', lang);
             response = lang === 'telugu' ? "⏳ నెలవారీ PDF నివేదిక తయారవుతోంది..." : "⏳ Generating Monthly PDF report...";
         } else {
-            response = await handleMonthlyReport(userId, lang);
+            response = await handleMonthlyReport(userId, currentUser, lang);
         }
     } else if (commandObj.command === 'YEARLY') {
         if (commandObj.isPdf) {
             handlePdfReport(userId, user.phone_number, 'yearly', lang);
             response = lang === 'telugu' ? "⏳ వార్షిక PDF నివేదిక తయారవుతోంది..." : "⏳ Generating Yearly PDF report...";
         } else {
-            response = await handleYearlyReport(userId, lang);
+            response = await handleYearlyReport(userId, currentUser, lang);
         }
     } else if (commandObj.command === 'ACTIVATE') {
         response = await handleAdminActivateCommand(user, commandObj);
@@ -1017,7 +1141,7 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
                     ? `⏳ ${commandObj.date} PDF నివేదిక తయారవుతోంది...`
                     : `⏳ Generating PDF report for ${commandObj.date}...`;
             } else {
-                response = await handleCustomReport(userId, commandObj.date, lang);
+                response = await handleCustomReport(userId, currentUser, commandObj.date, lang);
             }
         } else if (commandObj.isPdf) {
             handlePdfReport(userId, user.phone_number, 'custom', lang, new Date().toISOString().split('T')[0]);
@@ -1027,14 +1151,24 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
             const startOfToday = new Date();
             startOfToday.setHours(0,0,0,0);
             const data = await getReportData(userId, startOfToday, new Date());
-            response = formatReportText('report_title_today', data, lang);
+
+            // Calculate Opening Balance and Closing Balance for today
+            let openingBalance = null;
+            let closingBalance = null;
+            if (currentUser.opening_balance !== null && currentUser.opening_balance !== undefined) {
+                const obValue = parseFloat(currentUser.opening_balance);
+                openingBalance = await calculateOpeningBalanceAtDate(userId, obValue, startOfToday);
+                closingBalance = openingBalance + data.totals.payment - data.totals.expense;
+            }
+
+            response = formatReportText('report_title_today', data, lang, null, openingBalance, closingBalance);
         }
     } else {
         response = "❌ Feature not implemented.";
     }
 
     if (!isInternal && response && ['SALE', 'EXPENSE', 'PAYMENT', 'UNDO'].includes(commandObj.command)) {
-        return await appendVyapaarNetMetrics(userId, response, lang);
+        return await appendVyapaarNetMetrics(userId, response, lang, currentUser);
     }
     return response;
 }
@@ -1050,5 +1184,7 @@ module.exports = {
     handleCustomReport,
     handlePdfReport,
     getVyapaarAllTimeMetrics,
-    appendVyapaarNetMetrics
+    appendVyapaarNetMetrics,
+    handleSetOpeningBalance,
+    calculateOpeningBalanceAtDate
 };

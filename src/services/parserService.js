@@ -154,7 +154,17 @@ function parseMessage(text) {
     if (['HI', 'HELLO', 'HELP', 'నమస్కారం', 'హలో', 'నమస్తే'].includes(command)) {
         return { command: 'WELCOME', sourceLang };
     }
-    
+
+    // Command: OB (Opening Balance)
+    if (command === 'OB') {
+        if (parts.length < 2 || !isStrictNumeric(parts[1])) return null;
+        return {
+            command: 'SET_OB',
+            amount: parseFloat(parts[1]),
+            sourceLang
+        };
+    }
+
     return null;
 }
 

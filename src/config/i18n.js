@@ -109,7 +109,15 @@ const translations = {
         pdf_type_payment: "PAYMENT",
         pdf_no_data: "📊 No data available to generate PDF.",
         err_use_telugu: "❌ Please use Telugu commands when language is set to Telugu.",
-        err_use_english: "❌ Please use English commands when language is set to English."
+        err_use_english: "❌ Please use English commands when language is set to English.",
+        ob_set: "✅ Opening balance set: Rs.{amount}",
+        ob_missing: "⚠️ Please enter your opening balance first\n\nExample:\nOB 5000",
+        ob_confirm_update: "⚠️ This will update your opening balance and recalculate all reports.\n\nReply YES to confirm",
+        ob_updated: "✅ Opening balance updated: Rs.{amount}",
+        ob_confirm_cancelled: "Opening balance update cancelled.",
+        report_opening_balance: "Opening Balance",
+        report_closing_balance: "Closing Balance",
+        net_closing_balance: "Closing Balance"
     },
     telugu: {
         welcome_title: "🚀 *VyapaarIQ కు స్వాగతం*",
@@ -221,7 +229,15 @@ const translations = {
         pdf_type_payment: "వసూళ్ళు",
         pdf_no_data: "📊 PDF తయారు చేయడానికి డేటా లేదు.",
         err_use_telugu: "❌ భాష తెలుగులో ఉన్నప్పుడు తెలుగు ఆదేశాలను మాత్రమే ఉపయోగించండి.",
-        err_use_english: "❌ భాష ఇంగ్లీష్‌ లో ఉన్నప్పుడు ఇంగ్లీష్ ఆదేశాలను మాత్రమే ఉపయోగించండి."
+        err_use_english: "❌ భాష ఇంగ్లీష్‌ లో ఉన్నప్పుడు ఇంగ్లీష్ ఆదేశాలను మాత్రమే ఉపయోగించండి.",
+        ob_set: "✅ ప్రారంభ బ్యాలెన్స్ సెట్ చేయబడింది: రూ.{amount}",
+        ob_missing: "⚠️ దయచేసి ముందుగా ప్రారంభ బ్యాలెన్స్ నమోదు చేయండి\n\nఉదాహరణ:\nOB 5000",
+        ob_confirm_update: "⚠️ ఇది మీ ప్రారంభ బ్యాలెన్స్‌ను అప్‌డేట్ చేయడం మరియు మొత్తం నివేదికలను పునర్లెక్కించడం.",
+        ob_updated: "✅ ప్రారంభ బ్యాలెన్స్ అప్‌డేట్ చేయబడింది: రూ.{amount}",
+        ob_confirm_cancelled: "ప్రారంభ బ్యాలెన్స్ అప్‌డేట్ రద్దు చేయబడింది.",
+        report_opening_balance: "ప్రారంభ బ్యాలెన్స్",
+        report_closing_balance: "ముగిసే బ్యాలెన్స్",
+        net_closing_balance: "ముగిసే బ్యాలెన్స్"
     }
 };
 
