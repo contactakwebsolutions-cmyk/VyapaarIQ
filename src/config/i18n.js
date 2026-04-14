@@ -3,6 +3,9 @@ const translations = {
         welcome_title: "🚀 *Welcome to VyapaarIQ*",
         welcome_subtitle: "_Simple. Smart. Professional._",
         welcome_intro: "Track your business directly from WhatsApp with these easy commands:",
+        cat_opening_balance: "0️⃣ *Opening Balance (Required)*",
+        cmd_set_opening_balance: "Set OB: `OB 5000`",
+        hint_opening_balance: "💡 _You must set your opening balance first before recording any transactions_",
         cat_sales: "1️⃣ *Sales*",
         cat_expenses: "2️⃣ *Expenses*",
         cat_payments: "3️⃣ *Payments Received*",
@@ -41,7 +44,7 @@ const translations = {
         undo_hint: "(Reply 'undo' to remove)",
         upgrade_pro_title: "🚀 *Upgrade to Pro*",
         get_features: "Get:",
-        pay_amount: "💳 *Pay ₹499 via UPI:*",
+        pay_amount: "💳 *Pay ₹99 via UPI (Limited Time Offer):*",
         paid_invalid_plan: "❌ *Invalid plan*\n\n👉 Use:\nPAID pro",
         payment_notified_title: "✅ *Payment notification received*",
         payment_notified_desc: "Admin will verify your payment and activate your plan shortly. You will get a confirmation message once ready. 🎉",
@@ -52,16 +55,16 @@ const translations = {
         trial_ended_title: "⚠️ *Your free trial has ended*",
         data_safe: "Your data is safe ✅",
         intro_pricing_block:
-            "VyapaarIQ\n" +
-            "🚀 *Introductory Pricing*\n\n" +
-            "Pro ⭐ Recommended\n" +
-            "₹499 ❌\n" +
-            "₹149",
+            "VyapaarIQ Pro\n" +
+            "🚀 *Introductory Offer*\n\n" +
+            "⭐ Was ₹499/month\n" +
+            "💰 Now ₹99/month\n\n" +
+            "✨ Limited Time Offer ✨",
         choose_plan: "*Choose a plan:*",
         std_plan_name: "🟡 *Standard Plan*",
-        pro_plan_name: "🟣 *Pro Plan*",
-        std_price: "₹99/month",
-        pro_price: "₹149/month",
+        pro_plan_name: "🟣 *Pro Plan - ₹99*",
+        std_price: "Free Trial (7 days)",
+        pro_price: "₹99/month (Introductory)",
          std_features: "• Daily & PDF reports\n• S / E / P entries\n• Pending tracking\n• Undo",
         pro_features: "• Everything in Standard +\n• Weekly report\n• Monthly report\n• Insights\n• PDF reports\n• Smart alerts",
         pay_via_upi: "💳 *Pay via UPI:*",
@@ -123,6 +126,9 @@ const translations = {
         welcome_title: "🚀 *VyapaarIQ కు స్వాగతం*",
         welcome_subtitle: "_సరళమైనది. స్మార్ట్. ప్రొఫెషనల్._",
         welcome_intro: "WhatsApp ద్వారా మీ వ్యాపారాన్ని ట్రాక్ చేయడానికి ఈ సులభమైన ఆదేశాలను ఉపయోగించండి:",
+        cat_opening_balance: "0️⃣ *ప్రారంభ బ్యాలెన్స్ (అవసరమైనది)*",
+        cmd_set_opening_balance: "OB సెట్ చేయండి: `OB 5000`",
+        hint_opening_balance: "💡 _ఏ ఎంట్రీని రికార్డ్ చేయడానికి ముందు మీరు ప్రారంభ బ్యాలెన్స్ సెట్ చేయాలి_",
         cat_sales: "1️⃣ *అమ్మకాలు (Sales)*",
         cat_expenses: "2️⃣ *ఖర్చులు (Expenses)*",
         cat_payments: "3️⃣ *వసూళ్లు (Payments)*",
@@ -161,7 +167,7 @@ const translations = {
         undo_hint: "(తొలగించడానికి 'వెనక్కి' అని టైప్ చేయండి)",
         upgrade_pro_title: "🚀 *ప్రో ప్లాన్ కు అప్‌గ్రేడ్ అవ్వండి*",
         get_features: "వీటిని పొందండి:",
-        pay_amount: "💳 *UPI ద్వారా ₹499 చెల్లించండి:*",
+        pay_amount: "💳 *UPI ద్వారా ₹99 చెల్లించండి (పరిమిత సమయ ఆఫర్):*",
         paid_invalid_plan: "❌ *తప్పుడు ప్లాన్*\n\n👉 వీటిని వాడండి:\nPAID pro",
         payment_notified_title: "✅ *చెల్లింపు సమాచారం అందింది*",
         payment_notified_desc: "అడ్మిన్ మీ చెల్లింపును ధృవీకరించి, త్వరలో మీ ప్లాన్‌ను యాక్టివేట్ చేస్తారు. పూర్తయిన తర్వాత మీకు మెసేజ్ వస్తుంది. 🎉",
@@ -172,16 +178,16 @@ const translations = {
         trial_ended_title: "⚠️ *మీ ఉచిత ట్రయల్ ముగిసింది*",
         data_safe: "మీ డేటా భద్రంగా ఉంది ✅",
         intro_pricing_block:
-            "VyapaarIQ\n" +
-            "🚀 *ప్రారంభ ఆఫర్ ధరలు*\n\n" +
-            "ప్రో ⭐ సిఫార్సు చేయబడినది\n" +
-            "₹499 ❌\n" +
-            "₹149",
+            "VyapaarIQ ప్రో\n" +
+            "🚀 *ప్రారంభ ఆఫర్*\n\n" +
+            "⭐ పూర్వం ₹499/నెల\n" +
+            "💰 ఇప్పుడు ₹99/నెల\n\n" +
+            "✨ పరిమిత సమయ ఆఫర్ ✨",
         choose_plan: "*ప్లాన్ ఎంచుకోండి:*",
         std_plan_name: "🟡 *స్టాండర్డ్ ప్లాన్*",
-        pro_plan_name: "🟣 *ప్రో ప్లాన్*",
-        std_price: "నెలకి ₹99",
-        pro_price: "నెలకి ₹149",
+        pro_plan_name: "🟣 *ప్రో ప్లాన్ - ₹99*",
+        std_price: "ఉచిత ట్రయల్ (7 రోజులు)",
+        pro_price: "₹99/నెల (ప్రారంభ ఆఫర్)",
         std_features: "• డైలీ & PDF నివేదికలు\n• అ / ఖ / వ ఎంట్రీలు\n• బాకీల ట్రాకింగ్\n• వెనక్కి తీసుకోండి",
         pro_features: "• స్టాండర్డ్ లో ఉన్నవన్నీ +\n• వారం నివేదిక\n• నెల నివేదిక\n• బిజినెస్ ఇన్సైట్స్\n• PDF నివేదికలు\n• స్మార్ట్ అలర్ట్స్",
         pay_via_upi: "💳 *UPI ద్వారా చెల్లించండి:*",

@@ -42,14 +42,14 @@ function personalText(lang, key, params = {}) {
         status_spending_lot: "⚠️ You are spending a lot",
         pay_title: "⚠️ Your PersonalIQ trial has ended",
         pay_intro_pricing_block:
-            "PersonalIQ\n" +
-            "🚀 *Introductory Pricing*\n\n" +
-            "Pro ⭐ Recommended\n" +
-            "₹149 ❌\n" +
-            "₹99",
+            "PersonalIQ Pro\n" +
+            "🚀 *Introductory Offer*\n\n" +
+            "⭐ Was ₹99/month\n" +
+            "💰 Now ₹59/month\n\n" +
+            "✨ Limited Time Offer ✨",
         pay_choose: "Choose a plan:",
         pay_standard: "",
-        pay_pro: "🟣 Pro – ₹99/month (Daily + Weekly/Monthly/Yearly)",
+        pay_pro: "🟣 Pro – ₹59/month (Introductory) - Daily + Weekly/Monthly/Yearly",
         pay_via_upi: "💳 Pay via UPI:",
         or_pay_using: "Or pay using:",
         upi_id_label: "• UPI ID:",
@@ -110,14 +110,14 @@ function personalText(lang, key, params = {}) {
         status_spending_lot: "⚠️ ఎక్కువగా ఖర్చు చేస్తున్నారు",
         pay_title: "⚠️ మీ PersonalIQ ట్రయల్ ముగిసింది",
         pay_intro_pricing_block:
-            "PersonalIQ\n" +
-            "🚀 *ప్రారంభ ఆఫర్ ధరలు*\n\n" +
-            "ప్రో ⭐ సిఫారసు చేయబడినది\n" +
-            "₹149 ❌\n" +
-            "₹99",
+            "PersonalIQ ప్రో\n" +
+            "🚀 *ప్రారంభ ఆఫర్*\n\n" +
+            "⭐ పూర్వం ₹99/నెల\n" +
+            "💰 ఇప్పుడు ₹59/నెల\n\n" +
+            "✨ పరిమిత సమయ ఆఫర్ ✨",
         pay_choose: "ప్లాన్ ఎంచుకోండి:",
         pay_standard: "",
-        pay_pro: "🟣 ప్రో – ₹99/నెల (daily + weekly/monthly/yearly)",
+        pay_pro: "🟣 ప్రో – ₹59/నెల (ప్రారంభ ఆఫర్) - daily + weekly/monthly/yearly",
         pay_via_upi: "💳 UPI ద్వారా చెల్లించండి:",
         or_pay_using: "లేదా వీటిని ఉపయోగించండి:",
         upi_id_label: "• UPI ID:",

@@ -25,6 +25,45 @@ async function calculateOpeningBalanceAtDate(userId, obValue, tillDate) {
     return obValue + received - expenses;
 }
 
+async function formatTransactionResponse(userId, transactionType, amount, categoryOrName, baseMessage, lang = 'english') {
+    // Fetch current user balance info
+    const userRes = await db.query('SELECT opening_balance FROM users WHERE id = $1', [userId]);
+    const user = userRes.rows[0];
+    const obValue = user && (user.opening_balance !== null && user.opening_balance !== undefined) ? parseFloat(user.opening_balance) : null;
+
+    let response = baseMessage;
+
+    // Add transaction summary box if OB is set
+    if (obValue !== null) {
+        const symbol = lang === 'telugu' ? 'రూ.' : 'Rs.';
+
+        // Get current metrics
+        const metricsRes = await db.query(`
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as total_received,
+                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses
+            FROM transactions
+            WHERE user_id = $1
+        `, [userId]);
+
+        const totalReceived = parseFloat(metricsRes.rows[0].total_received);
+        const totalExpenses = parseFloat(metricsRes.rows[0].total_expenses);
+        const closingBalance = obValue + totalReceived - totalExpenses;
+
+        response += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        response += `📊 *Balance Summary*\n`;
+        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        response += `Opening: ${symbol}${obValue}\n`;
+        response += `Received: ${symbol}${totalReceived}\n`;
+        response += `Expenses: ${symbol}${totalExpenses}\n`;
+        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        response += `Closing: ${symbol}${closingBalance}\n`;
+        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    }
+
+    return response;
+}
+
 function formatBatchEntryLine(commandObj) {
     if (!commandObj || !commandObj.command) return null;
 
@@ -149,13 +188,15 @@ async function handleSale(userId, commandObj, lang = 'english') {
             INSERT INTO transactions (user_id, type, amount, customer_id, customer_name)
             VALUES ($1, 'payment', $2, $3, $4)
         `, [userId, amount, null, null]);
-        
-        return `✅ ${t(lang, 'sale_recorded')}${amount} (${lang === 'telugu' ? 'చెల్లించబడింది' : 'paid'})\n\n${t(lang, 'undo_hint')}`;
+
+        const baseMsg = `✅ ${t(lang, 'sale_recorded')}${amount} (${lang === 'telugu' ? 'చెల్లించబడింది' : 'paid'})\n\n${t(lang, 'undo_hint')}`;
+        return await formatTransactionResponse(userId, 'sale', amount, null, baseMsg, lang);
     } else {
         // Fetch updated pending amount
         const checkCust = await db.query('SELECT pending_amount FROM customers WHERE id = $1', [customerId]);
         const currentPending = parseFloat(checkCust.rows[0].pending_amount);
-        return `✅ ${t(lang, 'credit_recorded')} ${customerName}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${amount}\n💰 ${lang === 'telugu' ? 'బాకీ' : 'Pending'}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${currentPending}\n\n${t(lang, 'undo_hint')}`;
+        const baseMsg = `✅ ${t(lang, 'credit_recorded')} ${customerName}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${amount}\n💰 ${lang === 'telugu' ? 'బాకీ' : 'Pending'}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${currentPending}\n\n${t(lang, 'undo_hint')}`;
+        return await formatTransactionResponse(userId, 'credit_sale', amount, customerName, baseMsg, lang);
     }
 }
 
@@ -186,7 +227,8 @@ async function handlePayment(userId, commandObj, lang = 'english') {
         VALUES ($1, 'payment', $2, $3, $4)
     `, [userId, amount, customerId, customerName]);
 
-    return `💰 ${t(lang, 'payment_recorded')}${amount} (${customerName})\n${lang === 'telugu' ? 'మిగిలిన బాకీ' : 'Remaining pending'}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${newPending}\n\n${t(lang, 'undo_hint')}`;
+    const baseMsg = `💰 ${t(lang, 'payment_recorded')}${amount} (${customerName})\n${lang === 'telugu' ? 'మిగిలిన బాకీ' : 'Remaining pending'}: ${lang === 'telugu' ? 'రూ.' : 'Rs.'}${newPending}\n\n${t(lang, 'undo_hint')}`;
+    return await formatTransactionResponse(userId, 'payment', amount, customerName, baseMsg, lang);
 }
 
 async function getLastTransaction(userId) {
@@ -806,6 +848,9 @@ function getWelcomeMessage(lang = 'english') {
     return `${t(lang, 'welcome_title')}\n` +
            `${t(lang, 'welcome_subtitle')}\n\n` +
            `${t(lang, 'welcome_intro')}\n\n` +
+           `${t(lang, 'cat_opening_balance')}\n` +
+           `• ${t(lang, 'cmd_set_opening_balance')}\n` +
+           `${t(lang, 'hint_opening_balance')}\n\n` +
            `${t(lang, 'cat_sales')}\n` +
            `• ${t(lang, 'cmd_cash_sale')}\n` +
            `• ${t(lang, 'cmd_credit_sale')}\n\n` +
@@ -1103,7 +1148,8 @@ async function processCommand(user, commandObj, subscriptionInfo = {}, rawText =
             INSERT INTO transactions (user_id, type, amount, category)
             VALUES ($1, 'expense', $2, $3)
         `, [userId, amount, category]);
-        response = `✅ ${t(lang, 'expense_recorded')}${amount}${category ? ` (${category})` : ''}\n\n${t(lang, 'undo_hint')}`;
+        const baseMsg = `✅ ${t(lang, 'expense_recorded')}${amount}${category ? ` (${category})` : ''}\n\n${t(lang, 'undo_hint')}`;
+        response = await formatTransactionResponse(userId, 'expense', amount, category, baseMsg, lang);
     } else if (commandObj.command === 'PAYMENT') {
         response = await handlePayment(userId, commandObj, lang);
     } else if (commandObj.command === 'UNDO') {
@@ -1186,5 +1232,6 @@ module.exports = {
     getVyapaarAllTimeMetrics,
     appendVyapaarNetMetrics,
     handleSetOpeningBalance,
-    calculateOpeningBalanceAtDate
+    calculateOpeningBalanceAtDate,
+    formatTransactionResponse
 };
