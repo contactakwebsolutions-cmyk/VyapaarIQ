@@ -355,11 +355,11 @@ async function appendVyapaarNetMetrics(userId, baseMessage, lang, user = null) {
         netStr += `${t(lang, 'report_opening_balance')}: ${symbol}${obFormatted}\n`;
     }
 
-    netStr += `${t(lang, 'report_sales')}: ${symbol}${parseFloat(metrics.netSales).toFixed(2).replace(/\.00$/, '')}\n`;
-    netStr += `${t(lang, 'report_expenses')}: ${symbol}${parseFloat(metrics.netExpenses).toFixed(2).replace(/\.00$/, '')}\n`;
-    netStr += `${t(lang, 'report_profit')}: ${symbol}${parseFloat(metrics.netProfit).toFixed(2).replace(/\.00$/, '')}\n`;
-    netStr += `${t(lang, 'report_received')}: ${symbol}${parseFloat(metrics.netReceived).toFixed(2).replace(/\.00$/, '')}\n`;
-    netStr += `\n${t(lang, 'report_total_pending')}: ${symbol}${parseFloat(metrics.netPending).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'net_sales')}: ${symbol}${parseFloat(metrics.netSales).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'net_expenses')}: ${symbol}${parseFloat(metrics.netExpenses).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'net_profit')}: ${symbol}${parseFloat(metrics.netProfit).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `${t(lang, 'net_received')}: ${symbol}${parseFloat(metrics.netReceived).toFixed(2).replace(/\.00$/, '')}\n`;
+    netStr += `\n${t(lang, 'net_pending')}: ${symbol}${parseFloat(metrics.netPending).toFixed(2).replace(/\.00$/, '')}\n`;
 
     // Closing Balance (if OB is set)
     if (metrics.closingBalance !== null) {
